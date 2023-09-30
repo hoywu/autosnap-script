@@ -5,6 +5,17 @@ A simple shell script for automatically creating and cleaning BTRFS subvolume sn
 
 - BTRFS filesystem + Systemd-boot
 
+## Recommended subvolume layout
+
+| subvolume   | mountpoint            |
+| ----------- | --------------------- |
+| @           | /                     |
+| @home       | /home                 |
+| @log        | /var/log              |
+| @pkg        | /var/cache/pacman/pkg |
+| @.snapshots | /.snapshots           |
+| @docker     | /var/lib/docker       | 
+
 ## Features
 
 ### `./autosnap.sh`
@@ -47,13 +58,13 @@ Delete all snapshots except the one currently mounted at `/`.
 
 ### `./autosnap.sh mount`
 
-mount `@.snapshots` subvolume to `/.snapshots` and exit. Do not automatically unmount the snapshots subvolume so that the user can manually inspect it.
+Mount `@.snapshots` subvolume to `/.snapshots` and exit. Do not automatically unmount the snapshots subvolume so that the user can manually inspect it.
 
 ### `./autosnap.sh mount 2023-09-30/@09-00`
 
-Restore to specified snapshot.
+Restore to a specified snapshot.
 
-Check if the snapshot specified in the argument exists. If it does, modify the mount options in the Systemd-boot config file (`/boot/loader/entries/arch.conf`) so that the snapshot will be mounted on the next reboot.
+Check if the snapshot specified in the argument exists. If it does, create a backup (e.g. `/boot/loader/entries/arch.conf.202309301800.bak`) and then modify the mount options in the Systemd-boot config file (`/boot/loader/entries/arch.conf`) so that the snapshot will be mounted on the next reboot.
 
 You can change the following variables at the beginning of the script.
 
