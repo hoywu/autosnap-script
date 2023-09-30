@@ -106,21 +106,23 @@ fi
 sudo mkdir -p "$SNAPSHOT_DIR/$CURRENT_DATE"
 
 # 检查最近的快照时间
-LATEST_SNAPSHOT=$(find "$SNAPSHOT_DIR/$CURRENT_DATE" -maxdepth 1 -mindepth 1 ! -name ".*" | sort | tail -n 1)
-if [ -n "$LATEST_SNAPSHOT" ]; then
-  LATEST_TIME=$(basename "$LATEST_SNAPSHOT" | cut -d'@' -f2)
-  LATEST_HOUR=${LATEST_TIME%-*}
-  LATEST_MINUTE=${LATEST_TIME#*-}
+if [ "$1" != "now" ]; then
+  LATEST_SNAPSHOT=$(find "$SNAPSHOT_DIR/$CURRENT_DATE" -maxdepth 1 -mindepth 1 ! -name ".*" | sort | tail -n 1)
+  if [ -n "$LATEST_SNAPSHOT" ]; then
+    LATEST_TIME=$(basename "$LATEST_SNAPSHOT" | cut -d'@' -f2)
+    LATEST_HOUR=${LATEST_TIME%-*}
+    LATEST_MINUTE=${LATEST_TIME#*-}
 
-  # 计算时间差
-  CURRENT_MINUTES=$((10#$CURRENT_HOUR * 60 + 10#$CURRENT_MINUTE))
-  LATEST_MINUTES=$((10#$LATEST_HOUR * 60 + 10#$LATEST_MINUTE))
-  TIME_DIFF=$((CURRENT_MINUTES - LATEST_MINUTES))
+    # 计算时间差
+    CURRENT_MINUTES=$((10#$CURRENT_HOUR * 60 + 10#$CURRENT_MINUTE))
+    LATEST_MINUTES=$((10#$LATEST_HOUR * 60 + 10#$LATEST_MINUTE))
+    TIME_DIFF=$((CURRENT_MINUTES - LATEST_MINUTES))
 
-  # 如果距离上一次快照不足1小时，则退出
-  if [ $TIME_DIFF -lt 60 ]; then
-    suc "=> Last snapshot was taken less than 1 hour ago, skipping."
-    clean_exit
+    # 如果距离上一次快照不足1小时，则退出
+    if [ $TIME_DIFF -lt 60 ]; then
+      suc "=> Last snapshot was taken less than 1 hour ago, skipping."
+      clean_exit
+    fi
   fi
 fi
 
