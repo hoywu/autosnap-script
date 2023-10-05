@@ -26,6 +26,58 @@ err() {
   echo -e "\033[31m$1\033[0m"
 }
 
+snap_now() {
+  if [ "$2" == "" ]; then
+    SNAP="$SNAPSHOT_DIR/$CURRENT_DATE/@$CURRENT_TIME"
+  else
+    SNAP=$2
+  fi
+  sudo btrfs subvolume snapshot "$1" "$SNAP"
+}
+
+clean_prev_date() {
+  # 获取前一天的日期
+  PREVIOUS_DATE=$(TZ=$TIMEZONE date -d "yesterday" +'%Y-%m-%d')
+
+  # 检查前一天的日期目录是否存在
+  if [ -d "$SNAPSHOT_DIR/$PREVIOUS_DATE" ]; then
+    # 检查前一天日期目录中的快照数量
+    DIR_COUNT=$(ls $SNAPSHOT_DIR/$PREVIOUS_DATE | wc -l)
+
+    # 如果快照数量大于1，则保留时间最早的一个，删除其余所有快照
+    if [ $DIR_COUNT -gt 1 ]; then
+      EARLIEST_SNAPSHOT=$(find "$SNAPSHOT_DIR/$PREVIOUS_DATE" -maxdepth 1 -mindepth 1 ! -name ".*" | sort | head -n 1)
+      for DIR in "$SNAPSHOT_DIR/$PREVIOUS_DATE"/@*; do
+        if [ "$DIR" != "$EARLIEST_SNAPSHOT" ]; then
+          sudo btrfs subvolume delete "$DIR"
+        fi
+      done
+    fi
+  fi
+}
+
+check_snap_exists() {
+  # 检查指定快照是否存在
+  if [ ! -d "$SNAPSHOT_DIR/$1" ]; then
+    err "=> Snapshot $SNAPSHOT_DIR/$1 does not exist."
+    return 1
+  fi
+  return 0
+}
+
+mount_snap() {
+  # 挂载指定快照
+  check_snap_exists $1
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  cp -f ${BOOT_FILE} "${BOOT_FILE}.$(TZ=$TIMEZONE date +'%Y%m%d%H%M%S').bak"
+  awk -i inplace -v snap="subvol=${SUBVOLUME_NAME}/${SNAPSHOT_DIR##*/}/$1" '{gsub(/subvol=[^ ]*/, snap); print}' ${BOOT_FILE}
+  cat ${BOOT_FILE}
+  suc "=> Systemd-boot config updated. Check the above config before reboot."
+  return 0
+}
+
 clean_exit() {
   # 清理 SNAPSHOT_DIR 中的空文件夹
   find "$SNAPSHOT_DIR" -maxdepth 1 -mindepth 1 ! -name ".*" -type d -empty -exec echo "Clean: {}" \; -delete
@@ -70,6 +122,12 @@ elif [ "$1" == "clean" ]; then
     clean_exit 0
   fi
 
+  if [ "$2" == "yesterday" ]; then
+    # 清理前一天的快照目录
+    clean_prev_date
+    clean_exit 0
+  fi
+
   # 清理一周前的所有快照
   ONE_WEEK_AGO=$(TZ=$TIMEZONE date -d "1 week ago" +'%Y-%m-%d')
   for DIR in "$SNAPSHOT_DIR"/*; do
@@ -86,20 +144,44 @@ elif [ "$1" == "mount" ]; then
 
   if [ "$2" != "" ]; then
     # 挂载指定快照
-    if [ ! -d "$SNAPSHOT_DIR/$2" ]; then
-      err "=> Snapshot $SNAPSHOT_DIR/$2 does not exist."
-      clean_exit 1
-    fi
-    cp -f ${BOOT_FILE} "${BOOT_FILE}.$(TZ=$TIMEZONE date +'%Y%m%d%H%M%S').bak"
-    awk -i inplace -v snap="subvol=${SUBVOLUME_NAME}/${SNAPSHOT_DIR##*/}/$2" '{gsub(/subvol=[^ ]*/, snap); print}' ${BOOT_FILE}
-    cat ${BOOT_FILE}
-    suc "=> Systemd-boot config updated. Check the above config before reboot."
-    clean_exit 0
+    mount_snap $2
+    clean_exit $?
   fi
 
   # 仅挂载快照子卷
   suc "=> Mount subvolume ${SUBVOLUME_NAME} to ${MOUNT_POINT}"
   exit 0
+
+elif [ "$1" == "restore" ]; then
+
+  if [ "$2" != "" ]; then
+    # 恢复到指定快照
+    check_snap_exists $2
+    if [ $? -ne 0 ]; then
+      clean_exit 1
+    fi
+
+    # 备份当前
+    suc "=> Backup current subvolume..."
+    snap_now /
+
+    # 备份要恢复的快照
+    check_snap_exists $2.bak
+    if [ $? -eq 0 ]; then
+      war "=> Snapshot $2.bak already exists, skip backup."
+    else
+      suc "=> Backup snapshot $2..."
+      snap_now "$SNAPSHOT_DIR/$2" "$SNAPSHOT_DIR/$2.bak"
+    fi
+
+    # 恢复快照
+    suc "=> Mount snapshot $2..."
+    mount_snap $2
+    clean_exit $?
+  fi
+
+  err "=> Please specify a snapshot to restore."
+  clean_exit 1
 fi
 
 # 尝试创建今日快照目录
@@ -127,23 +209,4 @@ if [ "$1" != "now" ]; then
 fi
 
 # 如果满足条件，则创建新的快照
-sudo btrfs subvolume snapshot / "$SNAPSHOT_DIR/$CURRENT_DATE/@$CURRENT_TIME"
-
-# 获取前一天的日期
-PREVIOUS_DATE=$(TZ=$TIMEZONE date -d "yesterday" +'%Y-%m-%d')
-
-# 检查前一天的日期目录是否存在
-if [ -d "$SNAPSHOT_DIR/$PREVIOUS_DATE" ]; then
-  # 检查前一天日期目录中的快照数量
-  DIR_COUNT=$(ls $SNAPSHOT_DIR/$PREVIOUS_DATE | wc -l)
-
-  # 如果快照数量大于1，则保留时间最早的一个，删除其余所有快照
-  if [ $DIR_COUNT -gt 1 ]; then
-    EARLIEST_SNAPSHOT=$(find "$SNAPSHOT_DIR/$PREVIOUS_DATE" -maxdepth 1 -mindepth 1 ! -name ".*" | sort | head -n 1)
-    for DIR in "$SNAPSHOT_DIR/$PREVIOUS_DATE"/@*; do
-      if [ "$DIR" != "$EARLIEST_SNAPSHOT" ]; then
-        sudo btrfs subvolume delete "$DIR"
-      fi
-    done
-  fi
-fi
+snap_now /
