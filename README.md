@@ -32,13 +32,13 @@ BOOT_FILE="/boot/loader/entries/arch.conf"
 
 1. Automatically mount `@.snapshots` subvolume to `/.snapshots`.
 2. Create a directory using today's date (e.g. `/.snapshots/autosnap/2023-09-30`).
-3. Create a snapshot using `btrfs subvolume snapshot / "$SNAPSHOT_DIR/$CURRENT_DATE/@$CURRENT_TIME"` (e.g. `/.snapshots/autosnap/2023-09-30/@09-00`).
-4. If `$SNAPSHOT_DIR/$CURRENT_DATE` contains a snapshots created within the past hour, it will automatically exit without any operation.
+3. If `$SNAPSHOT_DIR/$CURRENT_DATE` contains a snapshots created within the past hour, it will unmount `@.snapshots` and exit without any operation.
+4. Otherwise, Create a snapshot using `btrfs subvolume snapshot / "$SNAPSHOT_DIR/$CURRENT_DATE/@$CURRENT_TIME"` (e.g. `/.snapshots/autosnap/2023-09-30/@09-00`).
 5. Unmount `@.snapshots` subvolume and exit.
 
 ### `./autosnap.sh now`
 
-Skip step 4 above and create a snapshot now.
+Skip step 3 above and create a snapshot now.
 
 ### `./autosnap.sh list`
 
@@ -62,7 +62,7 @@ Check the number of snapshots in yesterday's directory, and if it is greater tha
 
 ### `./autosnap.sh mount`
 
-Mount `@.snapshots` subvolume to `/.snapshots` and exit. Do not automatically unmount the snapshots subvolume so that the user can manually inspect it.
+Mount `@.snapshots` subvolume to `/.snapshots` and exit. It will not automatically unmount the snapshots subvolume so that the user can manually inspect it.
 
 ### `./autosnap.sh mount 2023-09-30/@09-00`
 
@@ -76,5 +76,5 @@ Restore to a specified snapshot.
 
 1. Create a snapshot. (`./autosnap.sh now`)
 2. Backup the snapshot specified in the argument. (e.g. `btrfs subvolume snapshot "2023-09-30/@09-00" "2023-09-30/@09-00.bak"`)
-3. Mount to the specified snapshot. (`./autosnap.sh mount 2023-09-30/@09-00`)
+3. Mount to the specified snapshot. (e.g. `./autosnap.sh mount 2023-09-30/@09-00`)
 
