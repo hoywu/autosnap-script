@@ -9,9 +9,10 @@ BOOT_FILE="/boot/loader/entries/arch.conf"
 
 # 设置时区并获取当前日期和时间
 CURRENT_DATE=$(TZ=$TIMEZONE date +'%Y-%m-%d')
-CURRENT_TIME=$(TZ=$TIMEZONE date +'%H-%M')
+CURRENT_TIME=$(TZ=$TIMEZONE date +'%H-%M-%S')
 CURRENT_HOUR=$(TZ=$TIMEZONE date +'%H')
 CURRENT_MINUTE=$(TZ=$TIMEZONE date +'%M')
+CURRENT_SECOND=$(TZ=$TIMEZONE date +'%S')
 
 MOUNT_DEVICE=$(df / | tail -n 1 | awk '{print $1}')                   # 获取根分区设备
 sudo mount -o subvol=${SUBVOLUME_NAME} "$MOUNT_DEVICE" "$MOUNT_POINT" # 挂载 @.snapshots 子卷
@@ -166,12 +167,11 @@ elif [ "$1" == "restore" ]; then
     snap_now /
 
     # 备份要恢复的快照
-    check_snap_exists $2.bak
-    if [ $? -eq 0 ]; then
-      war "=> Snapshot $2.bak already exists, skip backup."
-    else
+    if [ ! -d "$SNAPSHOT_DIR/$2.bak" ]; then
       suc "=> Backup snapshot $2..."
       snap_now "$SNAPSHOT_DIR/$2" "$SNAPSHOT_DIR/$2.bak"
+    else
+      war "=> Snapshot $2.bak already exists, skip backup."
     fi
 
     # 恢复快照
@@ -192,16 +192,18 @@ if [ "$1" != "now" ]; then
   LATEST_SNAPSHOT=$(find "$SNAPSHOT_DIR/$CURRENT_DATE" -maxdepth 1 -mindepth 1 ! -name ".*" | sort | tail -n 1)
   if [ -n "$LATEST_SNAPSHOT" ]; then
     LATEST_TIME=$(basename "$LATEST_SNAPSHOT" | cut -d'@' -f2)
-    LATEST_HOUR=${LATEST_TIME%-*}
-    LATEST_MINUTE=${LATEST_TIME#*-}
+    TIME=${LATEST_TIME//-/:}
+    LATEST_HOUR=$(date -d "$TIME" +'%H')
+    LATEST_MINUTE=$(date -d "$TIME" +'%M')
+    LATEST_SECOND=$(date -d "$TIME" +'%S')
 
     # 计算时间差
-    CURRENT_MINUTES=$((10#$CURRENT_HOUR * 60 + 10#$CURRENT_MINUTE))
-    LATEST_MINUTES=$((10#$LATEST_HOUR * 60 + 10#$LATEST_MINUTE))
-    TIME_DIFF=$((CURRENT_MINUTES - LATEST_MINUTES))
+    CURRENT_SECONDS=$((10#$CURRENT_HOUR * 3600 + 10#$CURRENT_MINUTE * 60 + 10#$CURRENT_SECOND))
+    LATEST_SECONDS=$((10#$LATEST_HOUR * 3600 + 10#$LATEST_MINUTE * 60 + 10#$LATEST_SECOND))
+    TIME_DIFF=$((CURRENT_SECONDS - LATEST_SECONDS))
 
     # 如果距离上一次快照不足1小时，则退出
-    if [ $TIME_DIFF -lt 60 ]; then
+    if [ $TIME_DIFF -lt 3600 ]; then
       suc "=> Last snapshot was taken less than 1 hour ago, skipping."
       clean_exit 0
     fi
