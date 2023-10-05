@@ -34,7 +34,7 @@ clean_exit() {
     sudo umount "$MOUNT_POINT"
     #sleep 1
   done
-  exit 0
+  exit $1
 }
 
 # 检查执行参数
@@ -43,12 +43,12 @@ if [ "$1" == "list" ]; then
   if [ "$2" == "all" ]; then
     # 列表列出所有快照
     find ${SNAPSHOT_DIR} -maxdepth 2 -mindepth 2 ! -name ".*"
-    clean_exit
+    clean_exit 0
   fi
 
   # 默认以树形结构列出所有快照
   tree -L 2 "$SNAPSHOT_DIR"
-  clean_exit
+  clean_exit 0
 
 elif [ "$1" == "clean" ]; then
 
@@ -58,7 +58,7 @@ elif [ "$1" == "clean" ]; then
     read -r confirm
     echo -n -e "\033[0m"
     if [[ "$confirm" != "y" ]]; then
-      clean_exit
+      clean_exit 0
     fi
     CURRENT_SUBVOLUME=$(mount | grep " / " | sed -n -e 's/.*subvol=\/\?\([^,)]*\).*/\1/p' | sed -n -e 's/.*\(\/.*\/.*\)/\1/p')
     CURRENT_SUBVOLUME=${SNAPSHOT_DIR}${CURRENT_SUBVOLUME}
@@ -67,7 +67,7 @@ elif [ "$1" == "clean" ]; then
         sudo btrfs subvolume delete "$snap"
       fi
     done
-    clean_exit
+    clean_exit 0
   fi
 
   # 清理一周前的所有快照
@@ -80,7 +80,7 @@ elif [ "$1" == "clean" ]; then
       fi
     fi
   done
-  clean_exit
+  clean_exit 0
 
 elif [ "$1" == "mount" ]; then
 
@@ -88,13 +88,13 @@ elif [ "$1" == "mount" ]; then
     # 挂载指定快照
     if [ ! -d "$SNAPSHOT_DIR/$2" ]; then
       err "=> Snapshot $SNAPSHOT_DIR/$2 does not exist."
-      clean_exit
+      clean_exit 1
     fi
     cp -f ${BOOT_FILE} "${BOOT_FILE}.$(TZ=$TIMEZONE date +'%Y%m%d%H%M%S').bak"
     awk -i inplace -v snap="subvol=${SUBVOLUME_NAME}/${SNAPSHOT_DIR##*/}/$2" '{gsub(/subvol=[^ ]*/, snap); print}' ${BOOT_FILE}
     cat ${BOOT_FILE}
     suc "=> Systemd-boot config updated. Check the above config before reboot."
-    clean_exit
+    clean_exit 0
   fi
 
   # 仅挂载快照子卷
@@ -121,7 +121,7 @@ if [ "$1" != "now" ]; then
     # 如果距离上一次快照不足1小时，则退出
     if [ $TIME_DIFF -lt 60 ]; then
       suc "=> Last snapshot was taken less than 1 hour ago, skipping."
-      clean_exit
+      clean_exit 0
     fi
   fi
 fi
