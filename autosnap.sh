@@ -72,16 +72,16 @@ mount_snap() {
   if [ $? -ne 0 ]; then
     return 1
   fi
-  cp -f ${BOOT_FILE} "${BOOT_FILE}.$(TZ=$TIMEZONE date +'%Y%m%d%H%M%S').bak"
-  awk -i inplace -v snap="subvol=${SUBVOLUME_NAME}/${SNAPSHOT_DIR##*/}/$1" '{gsub(/subvol=[^ ]*/, snap); print}' ${BOOT_FILE}
-  cat ${BOOT_FILE}
+  sudo cp -f ${BOOT_FILE} "${BOOT_FILE}.$(TZ=$TIMEZONE date +'%Y%m%d%H%M%S').bak"
+  sudo awk -i inplace -v snap="subvol=${SUBVOLUME_NAME}/${SNAPSHOT_DIR##*/}/$1" '{gsub(/subvol=[^ ]*/, snap); print}' ${BOOT_FILE}
+  sudo cat ${BOOT_FILE}
   suc "=> Systemd-boot config updated. Check the above config before reboot."
   return 0
 }
 
 clean_exit() {
   # 清理 SNAPSHOT_DIR 中的空文件夹
-  find "$SNAPSHOT_DIR" -maxdepth 1 -mindepth 1 ! -name ".*" -type d -empty -exec echo "Clean: {}" \; -delete
+  sudo find "$SNAPSHOT_DIR" -maxdepth 1 -mindepth 1 ! -name ".*" -type d -empty -exec echo "Clean: {}" \; -delete
   # 卸载 @.snapshots 子卷
   while mountpoint -q "$MOUNT_POINT"; do
     sudo umount "$MOUNT_POINT"
