@@ -210,7 +210,13 @@ restore_snapshot() {
 }
 
 auto_snap() {
-  # 检查最近的快照时间
+  # 如果今天没有快照，则创建一个
+  if [[ ! -d "${SNAPSHOT_DIR}/${CURRENT_DATE}" ]]; then
+    create_snapshot /
+    return
+  fi
+
+  # 检查今天最近的快照时间
   local latest_snapshot=$(find "${SNAPSHOT_DIR}/${CURRENT_DATE}" -maxdepth 1 -mindepth 1 ! -name ".*" | sort | tail -n 1)
 
   if [[ -n "${latest_snapshot}" ]]; then
@@ -220,6 +226,7 @@ auto_snap() {
     current_time=$(TZ=${TIMEZONE} date -d "${CURRENT_TIME//-/:}" +'%s')
     time_diff=$((current_time - latest_time))
 
+    # 如果最近的快照是在1小时内创建的，则跳过
     if [[ ${time_diff} -lt 3600 ]]; then
       log_success "=> Last snapshot was taken less than 1 hour ago, skipping."
       return
