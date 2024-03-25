@@ -35,7 +35,36 @@ require_confirm() {
   fi
 }
 
+check_command() {
+  if ! command -v "${1}" &>/dev/null; then
+    log_error "=> ${1} is not installed."
+    exit 1
+  fi
+}
+
+check_dependencies() {
+  # 检查依赖
+  check_command "btrfs"
+  check_command "df"
+  check_command "wc"
+  check_command "awk"
+  check_command "sed"
+  check_command "cut"
+  check_command "find"
+  check_command "grep"
+  check_command "sort"
+  check_command "head"
+  check_command "tail"
+  check_command "tree"
+  check_command "date"
+  check_command "dirname"
+  check_command "basename"
+  check_command "mountpoint"
+}
+
 init() {
+  check_dependencies
+
   # 挂载 @.snapshots 子卷
   sudo mount -o "subvol=${SUBVOLUME_NAME}" "${MOUNT_DEVICE}" "${MOUNT_POINT}"
 }
